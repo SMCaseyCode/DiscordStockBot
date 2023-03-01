@@ -4,6 +4,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.jacobpeterson.alpaca.model.endpoint.marketdata.historical.trade.Trade;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static SMCaseyCode.ProtectedData.URL;
@@ -132,6 +134,58 @@ public class DatabaseManager {
         }
     }
 
+    public int sellSymbol(String userID, String symbol, int qty){
+
+        try (Connection conn = connect()){
+
+            Trade trade = api.alpacaGetTrade(symbol);
+
+            if (trade != null){
+                double totalSale = trade.getP() * qty;
+
+                String selectQuery = "select quantity from portfolio where userID =? and symbol =?";
+                PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+                ps.setString(1, userID);
+                ps.setString(2, symbol);
+
+                ResultSet rs = ps.executeQuery();
+
+                if (rs.getInt("quantity") >= qty){
+
+                    String updateQuery = "update portfolio set quantity = (quantity - ?) where userID=? and symbol=?";
+                    ps = conn.prepareStatement(updateQuery);
+
+                    ps.setInt(1, qty);
+                    ps.setString(2, userID);
+                    ps.setString(3, symbol);
+
+                    ps.executeUpdate();
+
+                    updateQuery = "update users set userWallet = (userWallet + ?) where userID=?";
+                    ps = conn.prepareStatement(updateQuery);
+
+                    ps.setDouble(1, totalSale);
+                    ps.setString(2, userID);
+                    ps.executeUpdate();
+                    ps.close();
+
+                    return qty;
+
+                } else {
+                    return 0;
+                }
+            }else {
+                //if trade = null
+                return -2;
+            }
+
+        }catch (SQLException e){
+            System.out.println("SELL SYMBOL SQL ERROR: " + e);
+            return -3;
+        }
+    }
+
     private int checkOwnership(String userID, String symbol) {
         try (Connection conn = connect()){
 
@@ -151,6 +205,52 @@ public class DatabaseManager {
             System.out.println("CHECK OWNERSHIP SQL ERROR: " + e);
             return 0;
         }
+    }
+
+    public double checkWallet(String userID){
+        try (Connection conn = connect()){
+
+            String selectQuery = "select userWallet from users where userID=?";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ps.setString(1, userID);
+
+            ResultSet rs = ps.executeQuery();
+            double balance = rs.getDouble("userWallet");
+            ps.close();
+            return balance;
+
+        }catch (SQLException e){
+            System.out.println("SQL CHECK WALLET ERROR: " + e);
+            return -1;
+        }
+    }
+
+    public List<String> viewPortfolio(String userID){
+        List<String> positions = new ArrayList<>();
+
+        try (Connection conn = connect()){
+
+            String selectQuery = "select symbol, quantity from portfolio where userID=?";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+            ps.setString(1, userID);
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()){
+                positions.add(rs.getString(1));
+                positions.add(rs.getString(2));
+            }
+            ps.close();
+
+            return positions;
+
+        }catch (SQLException e){
+            System.out.println("VIEW PORTFOLIO SQL ERROR: " + e);
+            return null;
+        }
+
+
     }
 
 }
