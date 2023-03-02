@@ -29,10 +29,8 @@ public class DatabaseManager {
 
             ResultSet rs = ps.executeQuery();
 
-            while (rs.next()){
-                if (Objects.equals(rs.getString("userID"), userID)){
-                    break;
-                }else {
+
+                if (!Objects.equals(rs.getString("userID"), userID)){
                     String insertQuery = "insert into users(userID, userWallet) values (?,?)";
                     ps = conn.prepareStatement(insertQuery);
 
@@ -41,7 +39,6 @@ public class DatabaseManager {
 
                     ps.executeUpdate();
                 }
-            }
 
             ps.close();
 
