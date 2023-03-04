@@ -32,6 +32,10 @@ public class CommandManager extends ListenerAdapter {
         CheckPriceCommand cpc = new CheckPriceCommand();
         WalletCommand wc = new WalletCommand();
         ResetCommand rc = new ResetCommand();
+        BuyMaxCommand bmc = new BuyMaxCommand();
+        SellMaxCommand smc = new SellMaxCommand();
+        LeaderboardCommand lbc = new LeaderboardCommand();
+        HelpCommand hc = new HelpCommand();
 
         //Command Manager
         switch (command) {
@@ -41,6 +45,10 @@ public class CommandManager extends ListenerAdapter {
             case "checkprice" -> cpc.checkPriceCommandEvent(event);
             case "wallet" -> wc.walletCommandEvent(event);
             case "resetaccount" -> rc.resetCommandEvent(event);
+            case "buymax" -> bmc.buyMaxCommandEvent(event);
+            case "sellmax" -> smc.sellMaxEvent(event);
+            case "leaderboard" -> lbc.leaderboardCommandEvent(event);
+            case "help" -> hc.helpCommandEvent(event);
         }
 
     }
@@ -66,6 +74,14 @@ public class CommandManager extends ListenerAdapter {
 
         option = new OptionData(OptionType.STRING, "confirm", "Type Confirm To Wipe", true);
         commandData.add(Commands.slash("resetaccount", "WARNING: RESETS ACCOUNT || TYPE CONFIRM").addOptions(option));
+
+        option = new OptionData(OptionType.STRING, "symbol", "stock symbol", true);
+        commandData.add(Commands.slash("sellmax", "Sells total position").addOptions(option));
+        commandData.add(Commands.slash("buymax", "Purchases as many shares as possible").addOptions(option));
+
+        commandData.add(Commands.slash("leaderboard", "Shows the biggest whales"));
+
+        commandData.add(Commands.slash("help", "Use this for extra info!"));
 
         event.getJDA().updateCommands().addCommands(commandData).queue();
 

@@ -1,6 +1,5 @@
 package SMCaseyCode.Commands;
 
-import SMCaseyCode.AlpacaManager;
 import SMCaseyCode.DatabaseManager;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
@@ -20,7 +19,6 @@ import java.util.List;
 public class ViewCommand extends ListenerAdapter {
 
     DatabaseManager db = new DatabaseManager();
-    AlpacaManager api = new AlpacaManager();
 
     public void viewCommandEvent(SlashCommandInteractionEvent event) {
         String userID = event.getUser().getId();
@@ -42,7 +40,7 @@ public class ViewCommand extends ListenerAdapter {
             embed.setFooter("ID: " + userID);
             for (int i = 0; i < positions.size(); i++){
                 qty = Integer.parseInt(positions.get(i + 1));
-                individualPrice = api.alpacaGetTrade(positions.get(i)).getP();
+                individualPrice = db.getStockPrice(positions.get(i));
                 totalStockWorth += individualPrice * qty;
                 i += 2;
             }
@@ -85,10 +83,11 @@ public class ViewCommand extends ListenerAdapter {
             embed.setAuthor( name + "'s Portfolio", "https://www.youtube.com/watch?v=1FFBsX5C61Q", url);
             embed.setColor(Color.MAGENTA);
 
+            //Janky math here.
             for (int i = 0; i < positions.size(); i++){
 
                 qty = Integer.parseInt(positions.get(i + 1));
-                individualPrice = api.alpacaGetTrade(positions.get(i)).getP();
+                individualPrice = db.getStockPrice(positions.get(i));
 
                 //Grabs totalSpent from portfolio table
                 double totalCost = Double.parseDouble(positions.get(i + 2));
@@ -106,7 +105,7 @@ public class ViewCommand extends ListenerAdapter {
                     embed.addField( "+" + df.format(totalReturn) + "%", "return", true);
                 }else {
                     df.setRoundingMode(RoundingMode.FLOOR);
-                    embed.addField( "-" + df.format(totalReturn) + "%", "return", true);
+                    embed.addField( df.format(totalReturn) + "%", "return", true);
                 }
                 embed.addField("-----------------------------", "", false);
 

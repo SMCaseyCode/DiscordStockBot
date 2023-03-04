@@ -4,9 +4,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.jacobpeterson.alpaca.model.endpoint.marketdata.historical.trade.Trade;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.text.DecimalFormat;
+import java.util.*;
 
 import static SMCaseyCode.ProtectedData.URL;
 
@@ -14,20 +13,7 @@ public class DatabaseManager {
 
     AlpacaManager api = new AlpacaManager();
 
-    // POSSIBLE OPTIMIZATION
-    //TODO: Change DB To have current pricing of each symbol update once/per min. See Details Below:
-    // API supports 200 API calls per minute on free tier... uh oh. Solution? Here it is:
-    // 1. Place ALL symbols that are held by users into a DB.
-    // 2. Update first 200 price minute 1
-    // 3. Update second set of 200 price minute 2
-    // 4. Repeat until DB is fulfilled.
-    // Pros:
-    // "Fast" updates, users cannot rate limit bot
-    // Cons:
-    // After 200 x 15, may as well use a free unlimited call API w/ 15 minute delay. <-- unlikely to reach that point
-    // Would have to add a SECOND API for price check command
-
-    // ^ Spamming API did not rate limit. Will keep current structure for now ^
+    //TODO: Set up automatic removal of symbol in current_stock_data when not in portfolio table.
 
     public static Connection connect() throws SQLException {
         String url = URL.getContent();
@@ -136,6 +122,8 @@ public class DatabaseManager {
                         ps.close();
                     }
 
+                    insertNewSymbol(symbol, trade.getP(), conn);
+
                     String updateQuery = "update users set userWallet = (userWallet - ?) where userID=?";
                     ps = conn.prepareStatement(updateQuery);
 
@@ -161,12 +149,12 @@ public class DatabaseManager {
 
     public int sellSymbol(String userID, String symbol, int qty){
 
+        double stockPrice = getStockPrice(symbol);
+
         try (Connection conn = connect()){
 
-            Trade trade = api.alpacaGetTrade(symbol);
-
-            if (trade != null){
-                double totalSale = trade.getP() * qty;
+            if (stockPrice != -1){
+                double totalSale = stockPrice * qty;
 
                 String selectQuery = "select quantity, totalSpent from portfolio where userID =? and symbol =?";
                 PreparedStatement ps = conn.prepareStatement(selectQuery);
@@ -227,7 +215,7 @@ public class DatabaseManager {
         }
     }
 
-    private int checkOwnership(String userID, String symbol) {
+    public int checkOwnership(String userID, String symbol) {
         try (Connection conn = connect()){
 
             String selectQuery = "select quantity from portfolio where userID=? and symbol=?";
@@ -295,4 +283,156 @@ public class DatabaseManager {
 
     }
 
+    public HashMap<String, Double> getUserPositionWorth(){
+
+        try (Connection conn = connect()){
+
+            String selectQuery = "select userID, sum(quantity * current_price) as total from portfolio p " +
+                    "join current_stock_data c on p.symbol = c.symbol " +
+                    "group by userID order by total desc";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ResultSet rs = ps.executeQuery();
+            HashMap<String, Double> userMap = new HashMap<>();
+
+            DecimalFormat df = new DecimalFormat("#.##");
+
+            // Gives top 10 only
+            int counter = 0;
+
+            while (rs.next() && counter < 10){
+                double formattedValue = Double.parseDouble(df.format(rs.getDouble("total")));
+                userMap.put(rs.getString("userID"), formattedValue);
+                counter++;
+            }
+
+            return userMap;
+
+        }catch (SQLException e){
+            System.out.println("getUserPortfolioWorth SQL ERROR: " + e);
+        }
+        return null;
+    }
+
+    public void initialDataInsert(){
+
+        //Wipes table for fresh values
+        wipeData();
+
+        try (Connection conn = connect()){
+
+            String selectQuery = "select symbol from portfolio group by symbol";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ResultSet rs = ps.executeQuery();
+            HashMap<String,Double> stockData = new HashMap<>();
+
+            while (rs.next()){
+                double price = api.alpacaGetTrade(rs.getString("symbol")).getP();
+                stockData.put(rs.getString("symbol"), price);
+            }
+
+            String[] symbolArray = Arrays.toString(stockData.keySet().toArray())
+                    .replace('[', ' ')
+                    .replace(']',' ')
+                    .split(",");
+
+            for (String s : symbolArray){
+                String insertQuery = "insert into current_stock_data(symbol, current_price) values(?,?)";
+                ps = conn.prepareStatement(insertQuery);
+
+                ps.setString(1, s.trim());
+                ps.setDouble(2, stockData.get(s.trim()));
+
+                ps.executeUpdate();
+            }
+
+            ps.close();
+        }catch (SQLException e){
+            System.out.println("dataInsert SQL ERROR: " + e);
+        }
+    }
+
+    public void wipeData() {
+        try (Connection conn = connect()){
+
+            String deleteQuery = "delete from current_stock_data";
+            PreparedStatement ps = conn.prepareStatement(deleteQuery);
+
+            ps.executeUpdate();
+            ps.close();
+
+        }catch (SQLException e){
+            System.out.println("wipeData SQL ERROR: " + e);
+        }
+    }
+
+    public double getStockPrice(String symbol){
+        try (Connection conn = connect()){
+
+            String selectQuery = "select current_price from current_stock_data where symbol =?";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ps.setString(1, symbol);
+            ResultSet rs = ps.executeQuery();
+
+            double price = rs.getDouble("current_price");
+            ps.close();
+
+            if (price > 0){
+                return price;
+            }
+
+        }catch (SQLException e){
+            System.out.println("getStockPrice ERROR: " + e);
+        }
+
+        return -1;
+    }
+
+    public void updateStockData(){
+        try (Connection conn = connect()){
+
+            String selectQuery = "select symbol from current_stock_data";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()){
+                double price = api.alpacaGetTrade(rs.getString("symbol")).getP();
+
+                String updateQuery = "update current_stock_data set current_price =? where symbol=?";
+                ps = conn.prepareStatement(updateQuery);
+
+                ps.setDouble(1, price);
+                ps.setString(2, rs.getString("symbol"));
+
+                ps.executeUpdate();
+            }
+
+            ps.close();
+        }catch (SQLException e){
+            System.out.println("updateStockData SQL ERROR: " + e);
+        }
+    }
+
+    private void insertNewSymbol(String symbol, double price, Connection conn){
+
+        try{
+
+            String insertQuery = "insert into current_stock_data (symbol, current_price) select ?,? where not exists " +
+                    "(select symbol from current_stock_data where symbol = ?)";
+            PreparedStatement ps = conn.prepareStatement(insertQuery);
+
+            ps.setString(1, symbol);
+            ps.setDouble(2, price);
+            ps.setString(3, symbol);
+
+            ps.executeUpdate();
+            ps.close();
+
+        }catch (SQLException e){
+            System.out.println("PrivateInsertNewSymbol SQL ERROR: " + e);
+        }
+    }
 }
