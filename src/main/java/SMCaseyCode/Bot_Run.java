@@ -36,15 +36,21 @@ public class Bot_Run {
         getBot(bot);
         LeaderboardCommand.getBot(bot);
 
-        //Auto-runs autoUpdater
+        //Auto-runs autoUpdater + autoReducer
         final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(Bot_Run::autoUpdater, 60, 60, TimeUnit.SECONDS);
+        executorService.scheduleAtFixedRate(Bot_Run::autoReducer, 45, 45, TimeUnit.SECONDS);
 
     }
 
     //Auto-updates stock prices every minute. Needed due to API limits on free tier. Even then, it is limited
     private static void autoUpdater() {
         db.updateStockData();
+    }
+
+    //Reduces the current_stock_data table to compensate for limited API
+    private static void autoReducer() {
+        db.dataReduce();
     }
 
 

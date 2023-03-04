@@ -1,13 +1,11 @@
 package SMCaseyCode.Commands;
 
-import SMCaseyCode.AlpacaManager;
 import SMCaseyCode.DatabaseManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 
 public class SellCommand {
 
     DatabaseManager db = new DatabaseManager();
-    AlpacaManager api = new AlpacaManager();
 
     public void sellCommandEvent(SlashCommandInteractionEvent event) {
         String symbol = event.getOption("symbol").getAsString().toUpperCase();
@@ -16,7 +14,8 @@ public class SellCommand {
         if (qty <= 0){
             event.reply("Can't sell less than 1 share").setEphemeral(true).queue();
         } else {
-            double price = api.alpacaGetTrade(symbol).getP();
+            //double price = api.alpacaGetTrade(symbol).getP();
+            double price = db.getStockPrice(symbol);
 
             int sold = db.sellSymbol(event.getUser().getId(), symbol, qty);
 

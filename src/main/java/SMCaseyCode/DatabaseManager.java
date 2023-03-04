@@ -13,8 +13,6 @@ public class DatabaseManager {
 
     AlpacaManager api = new AlpacaManager();
 
-    //TODO: Set up automatic removal of symbol in current_stock_data when not in portfolio table.
-
     public static Connection connect() throws SQLException {
         String url = URL.getContent();
         return DriverManager.getConnection(url);
@@ -433,6 +431,40 @@ public class DatabaseManager {
 
         }catch (SQLException e){
             System.out.println("PrivateInsertNewSymbol SQL ERROR: " + e);
+        }
+    }
+
+    public void dataReduce(){
+
+        try (Connection conn = connect()){
+
+            String selectQuery = "select symbol from current_stock_data";
+            PreparedStatement ps = conn.prepareStatement(selectQuery);
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()){
+                String compareQuery = "select symbol from portfolio where symbol =?";
+                ps = conn.prepareStatement(compareQuery);
+
+                ps.setString(1, rs.getString("symbol"));
+                ResultSet rs2 = ps.executeQuery();
+
+                if (!rs2.next()){
+                    String deleteQuery = "delete from current_stock_data where symbol =?";
+                    ps = conn.prepareStatement(deleteQuery);
+
+                    ps.setString(1, rs.getString("symbol"));
+                    ps.executeUpdate();
+
+                }
+
+            }
+
+            ps.close();
+
+        }catch (SQLException e){
+            System.out.println("DataReduce SQL ERROR: " + e);
         }
     }
 }

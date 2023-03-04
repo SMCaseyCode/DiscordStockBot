@@ -10,7 +10,7 @@ public class BuyMaxCommand {
     AlpacaManager api = new AlpacaManager();
     public void buyMaxCommandEvent(SlashCommandInteractionEvent event){
         String userID = event.getUser().getId();
-        String symbol = event.getOption("symbol").getAsString();
+        String symbol = event.getOption("symbol").getAsString().toUpperCase();
         double wallet = db.checkWallet(userID);
         double cost = api.alpacaGetTrade(symbol).getP();
 
