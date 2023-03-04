@@ -14,6 +14,21 @@ public class DatabaseManager {
 
     AlpacaManager api = new AlpacaManager();
 
+    // POSSIBLE OPTIMIZATION
+    //TODO: Change DB To have current pricing of each symbol update once/per min. See Details Below:
+    // API supports 200 API calls per minute on free tier... uh oh. Solution? Here it is:
+    // 1. Place ALL symbols that are held by users into a DB.
+    // 2. Update first 200 price minute 1
+    // 3. Update second set of 200 price minute 2
+    // 4. Repeat until DB is fulfilled.
+    // Pros:
+    // "Fast" updates, users cannot rate limit bot
+    // Cons:
+    // After 200 x 15, may as well use a free unlimited call API w/ 15 minute delay. <-- unlikely to reach that point
+    // Would have to add a SECOND API for price check command
+
+    // ^ Spamming API did not rate limit. Will keep current structure for now ^
+
     public static Connection connect() throws SQLException {
         String url = URL.getContent();
         return DriverManager.getConnection(url);
@@ -92,27 +107,40 @@ public class DatabaseManager {
                     int owned = checkOwnership(userID, symbol);
 
                     if (owned > 0){
-                        String updateQuery = "update portfolio set quantity =? where userID =? and symbol=?";
+                        String totalSpentQuery = "select totalSpent, quantity from portfolio where userID=? and symbol =?";
+                        ps = conn.prepareStatement(totalSpentQuery);
+                        ps.setString(1, userID);
+                        ps.setString(2, symbol);
+                        rs = ps.executeQuery();
+                        double totalSpent = rs.getDouble("totalSpent") + totalStockPrice;
+                        int updatedQuantity = rs.getInt("quantity") + qty;
+
+                        String updateQuery = "update portfolio set quantity =?, totalSpent = (totalSpent + ?), avgCost =? where userID =? and symbol=?";
                         ps = conn.prepareStatement(updateQuery);
                         ps.setInt(1, (owned + qty));
-                        ps.setString(2, userID);
-                        ps.setString(3, symbol);
+                        ps.setDouble(2, totalStockPrice);
+                        ps.setDouble(3, totalSpent/updatedQuantity);
+                        ps.setString(4, userID);
+                        ps.setString(5, symbol);
                         ps.executeUpdate();
                         ps.close();
                     }else {
-                        String insertQuery = "insert into portfolio(userID, symbol, quantity) values (?,?,?)";
+                        String insertQuery = "insert into portfolio(userID, symbol, quantity, totalSpent, avgCost) values (?,?,?,?,?)";
                         ps = conn.prepareStatement(insertQuery);
                         ps.setString(1, userID);
                         ps.setString(2, symbol);
                         ps.setInt(3, qty);
+                        ps.setDouble(4, totalStockPrice);
+                        ps.setDouble(5, totalStockPrice/qty);
                         ps.executeUpdate();
                         ps.close();
                     }
 
-                    String updateQuery = "update users set userWallet = (userWallet - ?)";
+                    String updateQuery = "update users set userWallet = (userWallet - ?) where userID=?";
                     ps = conn.prepareStatement(updateQuery);
 
                     ps.setDouble(1, totalStockPrice);
+                    ps.setString(2, userID);
                     ps.executeUpdate();
                     ps.close();
 
@@ -140,26 +168,42 @@ public class DatabaseManager {
             if (trade != null){
                 double totalSale = trade.getP() * qty;
 
-                String selectQuery = "select quantity from portfolio where userID =? and symbol =?";
+                String selectQuery = "select quantity, totalSpent from portfolio where userID =? and symbol =?";
                 PreparedStatement ps = conn.prepareStatement(selectQuery);
 
                 ps.setString(1, userID);
                 ps.setString(2, symbol);
 
                 ResultSet rs = ps.executeQuery();
+                int updatedQuantity = rs.getInt("quantity");
+                double updatedCost = rs.getDouble("totalSpent") - totalSale;
 
                 if (rs.getInt("quantity") >= qty){
 
-                    String updateQuery = "update portfolio set quantity = (quantity - ?) where userID=? and symbol=?";
-                    ps = conn.prepareStatement(updateQuery);
+                    if (rs.getInt("quantity") - qty == 0){
+                        String deleteQuery = "delete from portfolio where userID=? and symbol=?";
+                        ps = conn.prepareStatement(deleteQuery);
 
-                    ps.setInt(1, qty);
-                    ps.setString(2, userID);
-                    ps.setString(3, symbol);
+                        ps.setString(1, userID);
+                        ps.setString(2, symbol);
 
-                    ps.executeUpdate();
+                        ps.executeUpdate();
+                    }else {
+                        String updateQuery = "update portfolio set quantity = (quantity - ?), totalSpent = (totalSpent - ?), avgCost =? where userID=? and symbol=?";
+                        ps = conn.prepareStatement(updateQuery);
 
-                    updateQuery = "update users set userWallet = (userWallet + ?) where userID=?";
+                        ps.setInt(1, qty);
+                        ps.setDouble(2, totalSale);
+                        ps.setDouble(3, updatedCost/updatedQuantity);
+                        ps.setString(4, userID);
+                        ps.setString(5, symbol);
+
+                        ps.executeUpdate();
+                    }
+
+
+
+                    String updateQuery = "update users set userWallet = (userWallet + ?) where userID=?";
                     ps = conn.prepareStatement(updateQuery);
 
                     ps.setDouble(1, totalSale);
@@ -228,7 +272,7 @@ public class DatabaseManager {
 
         try (Connection conn = connect()){
 
-            String selectQuery = "select symbol, quantity from portfolio where userID=?";
+            String selectQuery = "select symbol, quantity, totalSpent from portfolio where userID=?";
             PreparedStatement ps = conn.prepareStatement(selectQuery);
             ps.setString(1, userID);
 
@@ -237,6 +281,7 @@ public class DatabaseManager {
             while (rs.next()){
                 positions.add(rs.getString(1));
                 positions.add(rs.getString(2));
+                positions.add(String.valueOf(rs.getDouble("totalSpent")));
             }
             ps.close();
 
