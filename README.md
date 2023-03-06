@@ -33,4 +33,5 @@ This bot uses:
 
 ## Bot Screenshots
 
-<img src= "https://user-images.githubusercontent.com/104325289/223025279-ecbb5966-1161-46cf-804b-71815f1023e5.png" width="411" height ="700">
+![StockBotLin2](https://user-images.githubusercontent.com/104325289/223026819-9267868c-e5e1-4939-a6fb-a61d4037f237.jpg)
+
