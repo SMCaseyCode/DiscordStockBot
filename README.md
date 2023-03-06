@@ -3,7 +3,7 @@ US Stock Trading Simulator
 
 This repository is missing a file which contains sensitive info. If you plan on downloading and utilizing the code, you will have to insert your own. If you come across any issues, feel free to contact me.
 
-However, I will be hosting this bot myself for awhile. If you would like to try it, here is the link to add it to your own server: https://discord.com/api/oauth2/authorize?client_id=1080375357464645652&permissions=68608&scope=bot
+However, I will be hosting this bot myself for awhile. If you would like to try it without setup, here is the link to add it to your own server: https://discord.com/api/oauth2/authorize?client_id=1080375357464645652&permissions=68608&scope=bot
 
 This bot uses:
 - Java
