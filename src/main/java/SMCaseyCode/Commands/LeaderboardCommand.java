@@ -6,8 +6,10 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class LeaderboardCommand {
 
@@ -17,9 +19,21 @@ public class LeaderboardCommand {
 
         EmbedBuilder embed = new EmbedBuilder();
 
-        HashMap<String, Double> userMap = db.getUserPositionWorth();
-        String[] keySet = Arrays.toString(userMap.keySet().toArray()).replace('[', ' ').replace(']', ' ').split(",");
-        String[] valueSet = Arrays.toString(userMap.values().toArray()).replace('[', ' ').replace(']', ' ').split(",");
+        List<String> userList = db.getUserPositionWorth();
+        String[] keySet = new String[userList.size() / 2];
+        String[] valueSet = new String[userList.size() / 2];
+        int counter = 0;
+        int index = 0;
+
+        for (int i = 0; i < userList.size() - 1; i++){
+
+            keySet[index] =  userList.get(counter);
+            counter += 2;
+            i++;
+            valueSet[index] = userList.get(i);
+            index++;
+        }
+
         String[] nameArray = new String[keySet.length];
 
         for (int i = 0; i < keySet.length; i++){

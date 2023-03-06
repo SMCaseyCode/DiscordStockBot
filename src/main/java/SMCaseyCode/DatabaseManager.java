@@ -281,7 +281,7 @@ public class DatabaseManager {
 
     }
 
-    public HashMap<String, Double> getUserPositionWorth(){
+    public List<String> getUserPositionWorth(){
 
         try (Connection conn = connect()){
 
@@ -291,7 +291,7 @@ public class DatabaseManager {
             PreparedStatement ps = conn.prepareStatement(selectQuery);
 
             ResultSet rs = ps.executeQuery();
-            HashMap<String, Double> userMap = new HashMap<>();
+            List<String> userList = new ArrayList<>();
 
             DecimalFormat df = new DecimalFormat("#.##");
 
@@ -299,12 +299,13 @@ public class DatabaseManager {
             int counter = 0;
 
             while (rs.next() && counter < 10){
-                double formattedValue = Double.parseDouble(df.format(rs.getDouble("total")));
-                userMap.put(rs.getString("userID"), formattedValue);
+                String formattedValue = df.format(rs.getDouble("total"));
+                userList.add(rs.getString("userID"));
+                userList.add(formattedValue);
                 counter++;
             }
 
-            return userMap;
+            return userList;
 
         }catch (SQLException e){
             System.out.println("getUserPortfolioWorth SQL ERROR: " + e);
