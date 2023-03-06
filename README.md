@@ -1,4 +1,4 @@
 # DiscordStockBot
 Stock Trading Simulator
 
-W.I.P.
+ReadMe is W.I.P.
